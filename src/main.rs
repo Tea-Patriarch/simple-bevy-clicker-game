@@ -1,10 +1,16 @@
-use bevy::prelude::*;
+use bevy::{
+    prelude::*,
+    ui::BorderRadius,
+    ui_widgets::{Activate, Button, observe},
+};
 
 fn main() {
     let mut app = App::new();
     app.add_plugins(DefaultPlugins)
+        .insert_resource(ClickerData { tea: 0 })
+        .add_message::<ClickEvent>()
         .add_systems(Startup, setup)
-        .add_systems(Update, (update_clicks, click_system))
+        .add_systems(Update, update_clicks)
         .run();
 }
 
@@ -16,8 +22,10 @@ struct ClickerData {
 #[derive(Component)]
 struct ClickText;
 
+#[derive(Message)]
+struct ClickEvent;
+
 fn setup(mut commands: Commands) {
-    commands.insert_resource(ClickerData { tea: 0 });
     commands.spawn(Camera2d);
     commands.spawn((
         Node {
@@ -26,12 +34,7 @@ fn setup(mut commands: Commands) {
             flex_direction: FlexDirection::Column,
             justify_content: JustifyContent::Center,
             align_items: AlignItems::Center,
-            padding: UiRect {
-                left: Val::Px(10.0),
-                right: Val::Px(10.0),
-                top: Val::Px(10.0),
-                bottom: Val::Px(10.0),
-            },
+            padding: UiRect::all(Val::Px(10.0)),
             ..default()
         },
         children![
@@ -42,27 +45,52 @@ fn setup(mut commands: Commands) {
                 Node {
                     padding: UiRect {
                         top: Val::Px(30.0),
+                        bottom: Val::Px(60.0),
                         ..default()
                     },
                     ..default()
                 }
+            ),
+            (
+                //Increase tea count button
+                Button,
+                Node {
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(Val::Px(0.0)),
+                    border_radius: BorderRadius::all(Val::Px(10.0)),
+                    padding: UiRect::all(Val::Px(10.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgb(0.85, 0.85, 0.85)),
+                children![(
+                    Text::new("Brew tea"),
+                    TextFont {
+                        font_size: FontSize::Px(24.0),
+                        weight: FontWeight::BOLD,
+                        ..default()
+                    },
+                    TextColor(Color::srgb_u8(43, 44, 47))
+                ),],
+                observe(
+                    |_activate: On<Activate>, mut writer: MessageWriter<ClickEvent>| {
+                        writer.write(ClickEvent);
+                    }
+                ),
             )
         ],
     ));
 }
 
-fn update_clicks(data: Res<ClickerData>, mut q: Query<&mut Text, With<ClickText>>) {
-    let Ok(mut text) = q.single_mut() else {
-        return;
-    };
-    text.0 = data.tea.to_string();
-}
-
-fn click_system(
-    mouse_button_input: Res<ButtonInput<MouseButton>>,
-    mut data: ResMut<ClickerData>
+fn update_clicks(
+    mut data: ResMut<ClickerData>,
+    mut q: Query<&mut Text, With<ClickText>>,
+    mut message_reader: MessageReader<ClickEvent>,
 ) {
-    if mouse_button_input.just_pressed(MouseButton::Left) {
+    for _ in message_reader.read() {
         data.tea += 1;
+        for mut i in &mut q {
+            i.0 = data.tea.to_string()
+        }
     }
 }
